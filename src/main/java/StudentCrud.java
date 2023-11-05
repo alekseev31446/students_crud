@@ -6,11 +6,13 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.bson.BsonDocument;
+import org.bson.BsonInt32;
+import org.bson.BsonString;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -18,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.UpdateResult;
 
 @WebServlet("/StudentCrud")
 public class StudentCrud extends HttpServlet {
@@ -75,5 +78,53 @@ public class StudentCrud extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
+	
+	protected void doPut(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        MongoDatabase database = mongoDBConfig.getDatabase();
+        MongoCollection<Student> collection = database.getCollection("students", Student.class);
+
+        try {
+            String idParam = request.getParameter("id");
+            ObjectId studentId = new ObjectId(idParam);
+
+            Student updatedFields = objectMapper.readValue(request.getReader(), Student.class);
+
+            Bson filter = Filters.eq("_id", studentId);
+            Student existingStudent = collection.find(filter).first();
+
+            if (existingStudent != null) {
+                BsonDocument updateDoc = new BsonDocument();
+
+                if (updatedFields.getFirstName() != null) {
+                    updateDoc.put("firstName", new BsonString(updatedFields.getFirstName()));
+                }
+                if (updatedFields.getLastName() != null) {
+                    updateDoc.put("lastName", new BsonString(updatedFields.getLastName()));
+                }
+                if (updatedFields.getAge() > 0) {
+                    updateDoc.put("age", new BsonInt32(updatedFields.getAge()));
+                }
+                if (updatedFields.getDepartment() != null) {
+                    updateDoc.put("department", new BsonString(updatedFields.getDepartment()));
+                }
+
+                Bson update = new BsonDocument("$set", updateDoc);
+
+                UpdateResult updateResult = collection.updateOne(filter, update);
+
+                if (updateResult.getModifiedCount() > 0) {
+                	response.setStatus(HttpServletResponse.SC_OK);
+                } else {
+                    response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+                }
+            } else {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            }
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+
 
 }
