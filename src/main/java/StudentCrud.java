@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -49,7 +50,7 @@ public class StudentCrud extends HttpServlet {
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (Exception e) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             }
         } else {
@@ -59,5 +60,20 @@ public class StudentCrud extends HttpServlet {
             response.getWriter().print(studentsJson);
         }
 	}
+	
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        MongoDatabase database = mongoDBConfig.getDatabase();
+        MongoCollection<Student> collection = database.getCollection("students", Student.class);
+
+        try {
+            String jsonInput = request.getReader().lines().collect(Collectors.joining());
+            Student student = objectMapper.readValue(jsonInput, Student.class);
+
+            collection.insertOne(student);
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
 
 }
