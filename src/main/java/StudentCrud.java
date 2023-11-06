@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 
 @WebServlet("/StudentCrud")
@@ -122,6 +123,31 @@ public class StudentCrud extends HttpServlet {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             }
         } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+	
+	protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String idParam = request.getParameter("id");
+        if (idParam != null) {
+            ObjectId studentId = new ObjectId(idParam);
+            MongoDatabase database = mongoDBConfig.getDatabase();
+            MongoCollection<Student> collection = database.getCollection("students", Student.class);
+            Bson filter = Filters.eq("_id", studentId);
+            Student existingStudent = collection.find(filter).first();
+
+            if (existingStudent != null) {
+                DeleteResult deleteResult = collection.deleteOne(filter);
+
+                if (deleteResult.getDeletedCount() > 0) {
+                    response.setStatus(HttpServletResponse.SC_OK);
+                } else {
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                }
+            } else {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            }
+        } else {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
