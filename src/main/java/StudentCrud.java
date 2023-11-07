@@ -54,7 +54,7 @@ public class StudentCrud extends HttpServlet {
                     response.getWriter().print(studentJson);
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    logger.warn("Student not found for ID: {}", idParam);
+                    response.getWriter().println("Student not found for ID: " + idParam);
                 }
             } catch (Exception e) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -75,7 +75,8 @@ public class StudentCrud extends HttpServlet {
 
             getCollection("students").insertOne(student);
             
-            logger.info("Created a new student: {}", student.getId());
+            response.setContentType("application/json");
+            response.getWriter().print(objectMapper.writeValueAsString(student));
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             logger.error("Error in doPost", e);
@@ -114,13 +115,14 @@ public class StudentCrud extends HttpServlet {
 
                 if (updateResult.getModifiedCount() > 0) {
                 	response.setStatus(HttpServletResponse.SC_OK);
-                	logger.info("Updated student with ID: {}", studentId);
+                	response.setContentType("application/json");
+                    response.getWriter().print(updateDoc);
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
                 }
             } else {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                logger.warn("Student not found for update with ID: {}", studentId);
+                response.getWriter().println("Student not found for ID: " + idParam);
             }
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -141,17 +143,17 @@ public class StudentCrud extends HttpServlet {
 
 	                if (deleteResult.getDeletedCount() > 0) {
 	                    response.setStatus(HttpServletResponse.SC_OK);
-	                    logger.info("Deleted student with ID: {}", studentId);
+	                    response.getWriter().println("Deleted student with ID: {}" + studentId);
 	                } else {
 	                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 	                }
 	            } else {
 	                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-	                logger.warn("Student not found for delete with ID: {}", studentId);
+	                response.getWriter().println("Student not found for ID: " + idParam);
 	            }
 	        } else {
 	            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-	            logger.warn("Invalid request for student deletion without ID");
+	            response.getWriter().println("Invalid request for student deletion without ID");
 	        }
 	    } catch (Exception e) {
 	        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
