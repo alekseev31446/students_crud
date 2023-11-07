@@ -10,7 +10,7 @@ public class MongoDBConfig {
     private final MongoDatabase database;
 
     public MongoDBConfig() {
-        MongoClientURI uri = new MongoClientURI("mongodb://localhost:27017");
+        MongoClientURI uri = new MongoClientURI("mongodb://localhost:27018");
 
         CodecRegistry codecRegistry = CodecRegistries.fromRegistries(
             MongoClient.getDefaultCodecRegistry(),
@@ -19,10 +19,6 @@ public class MongoDBConfig {
 
         mongoClient = new MongoClient(uri);
         database = mongoClient.getDatabase("university").withCodecRegistry(codecRegistry);
-    }
-
-    public void close() {
-        mongoClient.close();
     }
 
 	public MongoDatabase getDatabase() {

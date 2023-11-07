@@ -15,10 +15,11 @@ import org.bson.BsonInt32;
 import org.bson.BsonString;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
@@ -28,24 +29,24 @@ public class StudentCrud extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	
 	private final MongoDBConfig mongoDBConfig;
+	private ObjectMapper objectMapper;
+    private Logger logger;
+
 
     public StudentCrud() {
-        super();
         mongoDBConfig = new MongoDBConfig();
+        objectMapper = new ObjectMapper();
+        logger = LoggerFactory.getLogger(StudentCrud.class);
     }
 
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		String idParam = request.getParameter("id");
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        MongoDatabase database = mongoDBConfig.getDatabase();
-        MongoCollection<Student> collection = database.getCollection("students", Student.class);
-
         if (idParam != null) {
             try {
                 ObjectId studentId = new ObjectId(idParam);
                 Bson filter = Filters.eq("_id", studentId);
-                Student student = collection.find(filter).first();
+                Student student = getCollection("students").find(filter).first();
 
                 if (student != null) {
                     String studentJson = objectMapper.writeValueAsString(student);
@@ -53,12 +54,14 @@ public class StudentCrud extends HttpServlet {
                     response.getWriter().print(studentJson);
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    logger.warn("Student not found for ID: {}", idParam);
                 }
             } catch (Exception e) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                logger.error("Error in doGet", e);
             }
         } else {
-            List<Student> students = collection.find().into(new ArrayList<>());
+            List<Student> students = getCollection("students").find().into(new ArrayList<>());
             String studentsJson = objectMapper.writeValueAsString(students);
             response.setContentType("application/json");
             response.getWriter().print(studentsJson);
@@ -66,25 +69,20 @@ public class StudentCrud extends HttpServlet {
 	}
 	
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        MongoDatabase database = mongoDBConfig.getDatabase();
-        MongoCollection<Student> collection = database.getCollection("students", Student.class);
-
         try {
             String jsonInput = request.getReader().lines().collect(Collectors.joining());
             Student student = objectMapper.readValue(jsonInput, Student.class);
 
-            collection.insertOne(student);
+            getCollection("students").insertOne(student);
+            
+            logger.info("Created a new student: {}", student.getId());
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            logger.error("Error in doPost", e);
         }
     }
 	
 	protected void doPut(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        MongoDatabase database = mongoDBConfig.getDatabase();
-        MongoCollection<Student> collection = database.getCollection("students", Student.class);
-
         try {
             String idParam = request.getParameter("id");
             ObjectId studentId = new ObjectId(idParam);
@@ -92,7 +90,7 @@ public class StudentCrud extends HttpServlet {
             Student updatedFields = objectMapper.readValue(request.getReader(), Student.class);
 
             Bson filter = Filters.eq("_id", studentId);
-            Student existingStudent = collection.find(filter).first();
+            Student existingStudent = getCollection("students").find(filter).first();
 
             if (existingStudent != null) {
                 BsonDocument updateDoc = new BsonDocument();
@@ -112,45 +110,59 @@ public class StudentCrud extends HttpServlet {
 
                 Bson update = new BsonDocument("$set", updateDoc);
 
-                UpdateResult updateResult = collection.updateOne(filter, update);
+                UpdateResult updateResult = getCollection("students").updateOne(filter, update);
 
                 if (updateResult.getModifiedCount() > 0) {
                 	response.setStatus(HttpServletResponse.SC_OK);
+                	logger.info("Updated student with ID: {}", studentId);
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
                 }
             } else {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                logger.warn("Student not found for update with ID: {}", studentId);
             }
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            logger.error("Error in doPut", e);
         }
     }
 	
 	protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String idParam = request.getParameter("id");
-        if (idParam != null) {
-            ObjectId studentId = new ObjectId(idParam);
-            MongoDatabase database = mongoDBConfig.getDatabase();
-            MongoCollection<Student> collection = database.getCollection("students", Student.class);
-            Bson filter = Filters.eq("_id", studentId);
-            Student existingStudent = collection.find(filter).first();
+	    String idParam = request.getParameter("id");
+	    try {
+	        if (idParam != null) {
+	            ObjectId studentId = new ObjectId(idParam);
+	            Bson filter = Filters.eq("_id", studentId);
+	            Student existingStudent = getCollection("students").find(filter).first();
 
-            if (existingStudent != null) {
-                DeleteResult deleteResult = collection.deleteOne(filter);
+	            if (existingStudent != null) {
+	                DeleteResult deleteResult = getCollection("students").deleteOne(filter);
 
-                if (deleteResult.getDeletedCount() > 0) {
-                    response.setStatus(HttpServletResponse.SC_OK);
-                } else {
-                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                }
-            } else {
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            }
-        } else {
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-        }
-    }
+	                if (deleteResult.getDeletedCount() > 0) {
+	                    response.setStatus(HttpServletResponse.SC_OK);
+	                    logger.info("Deleted student with ID: {}", studentId);
+	                } else {
+	                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+	                }
+	            } else {
+	                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+	                logger.warn("Student not found for delete with ID: {}", studentId);
+	            }
+	        } else {
+	            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+	            logger.warn("Invalid request for student deletion without ID");
+	        }
+	    } catch (Exception e) {
+	        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+	        logger.error("Error in doDelete", e);
+	    }
+	}
+
+	
+	private MongoCollection<Student> getCollection(String name){
+		return mongoDBConfig.getDatabase().getCollection(name, Student.class);
+	}
 
 
 }
